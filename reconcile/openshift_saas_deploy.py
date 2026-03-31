@@ -39,9 +39,12 @@ from reconcile.utils.unleash import get_feature_toggle_state
 
 QONTRACT_INTEGRATION = "openshift-saas-deploy"
 QONTRACT_INTEGRATION_VERSION = make_semver(0, 1, 0)
+GRAFANA_SAAS_DEPLOY_BASE_URL = (
+    "https://grafana.app-sre.devshift.net/d/saas-deploy-logs/saas-deploy-logs"
+)
 
 
-def compose_console_url(saas_file: SaasFile, env_name: str) -> str:
+def _saas_file_tekton_pipeline_name(saas_file: SaasFile) -> str:
     if not isinstance(saas_file.pipelines_provider, PipelinesProviderTektonV1):
         raise ValueError(
             f"Unsupported pipelines_provider: {saas_file.pipelines_provider}"
@@ -51,15 +54,32 @@ def compose_console_url(saas_file: SaasFile, env_name: str) -> str:
         if not saas_file.pipelines_provider.pipeline_templates
         else saas_file.pipelines_provider.pipeline_templates.openshift_saas_deploy.name
     )
-    pipeline_name = build_one_per_saas_file_tkn_pipeline_name(
+    return build_one_per_saas_file_tkn_pipeline_name(
         pipeline_template_name, saas_file.name
     )
+
+
+def compose_console_url(
+    saas_file: SaasFile, env_name: str, *, pipeline_name: str
+) -> str:
     tkn_name, _ = SaasHerder.build_saas_file_env_combo(saas_file.name, env_name)
 
     return (
         f"{saas_file.pipelines_provider.namespace.cluster.console_url}/k8s/ns/"
         f"{saas_file.pipelines_provider.namespace.name}/tekton.dev~v1~Pipeline/"
         f"{pipeline_name}/Runs?name={tkn_name}"
+    )
+
+
+def compose_grafana_logs_url(
+    saas_file: SaasFile, *, pipeline_name: str
+) -> str:
+    pipelines_provider = saas_file.pipelines_provider
+    assert isinstance(pipelines_provider, PipelinesProviderTektonV1)
+    base = GRAFANA_SAAS_DEPLOY_BASE_URL.rstrip("/")
+    return (
+        f"{base}?var-cluster={pipelines_provider.namespace.cluster.name}"
+        f"&var-namespace={pipelines_provider.namespace.name}&var-pipeline={pipeline_name}"
     )
 
 
@@ -70,6 +90,7 @@ def slack_notify(
     ri: ResourceInventory,
     console_url: str,
     in_progress: bool,
+    grafana_logs_url: str,
     trigger_integration: str | None = None,
     trigger_reason: str | None = None,
     skip_successful_notifications: bool | None = False,
@@ -97,7 +118,7 @@ def slack_notify(
     message = (
         f"{icon} SaaS file *{saas_file_name}* "
         + f"deployment to environment *{env_name}*: "
-        + f"{description} (<{console_url}|Open>)"
+        + f"{description} - (<{console_url}|PipelineRuns>) (<{grafana_logs_url}|Logs>)"
     )
     if trigger_reason:
         message += f". Reason: {trigger_reason}"
@@ -157,7 +178,13 @@ def run(
                 init_usergroups=False,
             )
             ri = ResourceInventory()
-            console_url = compose_console_url(saas_file, env_name)
+            pipeline_name = _saas_file_tekton_pipeline_name(saas_file)
+            console_url = compose_console_url(
+                saas_file, env_name, pipeline_name=pipeline_name
+            )
+            grafana_logs_url = compose_grafana_logs_url(
+                saas_file, pipeline_name=pipeline_name
+            )
             if (
                 defer
             ):  # defer is provided by the method decorator. this makes just mypy happy
@@ -173,6 +200,7 @@ def run(
                         trigger_integration=trigger_integration,
                         trigger_reason=trigger_reason,
                         skip_successful_notifications=skip_successful_deploy_notifications,
+                        grafana_logs_url=grafana_logs_url,
                     )
                 )
             # deployment start notification
@@ -187,6 +215,7 @@ def run(
                     trigger_integration=trigger_integration,
                     trigger_reason=trigger_reason,
                     skip_successful_notifications=skip_successful_deploy_notifications,
+                    grafana_logs_url=grafana_logs_url,
                 )
 
     jenkins_map = jenkins_base.get_jenkins_map()
