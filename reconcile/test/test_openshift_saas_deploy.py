@@ -22,6 +22,7 @@ from reconcile.utils.saasherder.saasherder import UNIQUE_SAAS_FILE_ENV_COMBO_LEN
 
 TEST_GRAFANA_LOGS_URL = "https://grafana.url/d/logs?var-cluster=c"
 
+
 @pytest.fixture
 def saas_file_builder(
     gql_class_factory: Callable[..., SaasFile],
@@ -63,8 +64,7 @@ def test_compose_grafana_logs_url(
     pipeline_name = _saas_file_tekton_pipeline_name(saas_file)
     url = compose_grafana_logs_url(saas_file, pipeline_name=pipeline_name)
     assert (
-        url
-        == f"{GRAFANA_SAAS_DEPLOY_BASE_URL}?"
+        url == f"{GRAFANA_SAAS_DEPLOY_BASE_URL}?"
         "var-cluster=cluster_name&var-namespace=namespace_name&"
         "var-pipeline=o-saas-deploy-saas_name"
     )
@@ -109,7 +109,6 @@ def test_compose_console_url_with_long_saas_name(
 ) -> None:
     saas_name = "this-is-a-very-looooooooooooooooooooooong-saas-name"
     saas_file = saas_file_builder(saas_name)
-    env_name = "app-sre-production"
 
     with pytest.raises(OpenshiftTektonResourcesNameTooLongError) as e:
         _saas_file_tekton_pipeline_name(saas_file)

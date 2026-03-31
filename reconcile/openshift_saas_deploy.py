@@ -71,9 +71,7 @@ def compose_console_url(
     )
 
 
-def compose_grafana_logs_url(
-    saas_file: SaasFile, *, pipeline_name: str
-) -> str:
+def compose_grafana_logs_url(saas_file: SaasFile, *, pipeline_name: str) -> str:
     pipelines_provider = saas_file.pipelines_provider
     assert isinstance(pipelines_provider, PipelinesProviderTektonV1)
     base = GRAFANA_SAAS_DEPLOY_BASE_URL.rstrip("/")
