@@ -62,8 +62,11 @@ def _saas_file_tekton_pipeline_name(saas_file: SaasFile) -> str:
 def compose_console_url(
     saas_file: SaasFile, env_name: str, *, pipeline_name: str
 ) -> str:
+    if not isinstance(saas_file.pipelines_provider, PipelinesProviderTektonV1):
+        raise ValueError(
+            f"Unsupported pipelines_provider: {saas_file.pipelines_provider}"
+        )
     pipelines_provider = saas_file.pipelines_provider
-    assert isinstance(pipelines_provider, PipelinesProviderTektonV1)
     tkn_name, _ = SaasHerder.build_saas_file_env_combo(saas_file.name, env_name)
 
     return (
@@ -74,8 +77,11 @@ def compose_console_url(
 
 
 def compose_grafana_logs_url(saas_file: SaasFile, *, pipeline_name: str) -> str:
+    if not isinstance(saas_file.pipelines_provider, PipelinesProviderTektonV1):
+        raise ValueError(
+            f"Unsupported pipelines_provider: {saas_file.pipelines_provider}"
+        )
     pipelines_provider = saas_file.pipelines_provider
-    assert isinstance(pipelines_provider, PipelinesProviderTektonV1)
     base = GRAFANA_SAAS_DEPLOY_BASE_URL.rstrip("/")
     return (
         f"{base}?var-cluster={pipelines_provider.namespace.cluster.name}"
