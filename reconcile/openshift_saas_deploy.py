@@ -62,11 +62,13 @@ def _saas_file_tekton_pipeline_name(saas_file: SaasFile) -> str:
 def compose_console_url(
     saas_file: SaasFile, env_name: str, *, pipeline_name: str
 ) -> str:
+    pipelines_provider = saas_file.pipelines_provider
+    assert isinstance(pipelines_provider, PipelinesProviderTektonV1)
     tkn_name, _ = SaasHerder.build_saas_file_env_combo(saas_file.name, env_name)
 
     return (
-        f"{saas_file.pipelines_provider.namespace.cluster.console_url}/k8s/ns/"
-        f"{saas_file.pipelines_provider.namespace.name}/tekton.dev~v1~Pipeline/"
+        f"{pipelines_provider.namespace.cluster.console_url}/k8s/ns/"
+        f"{pipelines_provider.namespace.name}/tekton.dev~v1~Pipeline/"
         f"{pipeline_name}/Runs?name={tkn_name}"
     )
 
