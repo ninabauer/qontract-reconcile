@@ -86,13 +86,11 @@ def compose_grafana_logs_url(
         )
     pipelines_provider = saas_file.pipelines_provider
     grafana_base_url = grafana_saas_deploy_url.rstrip("/")
-    params = urlencode(
-        {
-            "var-cluster": pipelines_provider.namespace.cluster.name,
-            "var-namespace": pipelines_provider.namespace.name,
-            "var-pipeline": pipeline_name,
-        }
-    )
+    params = urlencode({
+        "var-cluster": pipelines_provider.namespace.cluster.name,
+        "var-namespace": pipelines_provider.namespace.name,
+        "var-pipeline": pipeline_name,
+    })
     return f"{grafana_base_url}?{params}"
 
 
