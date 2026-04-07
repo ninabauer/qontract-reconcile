@@ -39,9 +39,6 @@ from reconcile.utils.unleash import get_feature_toggle_state
 
 QONTRACT_INTEGRATION = "openshift-saas-deploy"
 QONTRACT_INTEGRATION_VERSION = make_semver(0, 1, 0)
-GRAFANA_SAAS_DEPLOY_BASE_URL = (
-    "https://grafana.app-sre.devshift.net/d/saas-deploy-logs/saas-deploy-logs"
-)
 
 
 def _saas_file_tekton_pipeline_name(saas_file: SaasFile) -> str:
@@ -76,15 +73,20 @@ def compose_console_url(
     )
 
 
-def compose_grafana_logs_url(saas_file: SaasFile, *, pipeline_name: str) -> str:
+def compose_grafana_logs_url(
+    saas_file: SaasFile,
+    *,
+    pipeline_name: str,
+    grafana_saas_deploy_url: str,
+) -> str:
     if not isinstance(saas_file.pipelines_provider, PipelinesProviderTektonV1):
         raise ValueError(
             f"Unsupported pipelines_provider: {saas_file.pipelines_provider}"
         )
     pipelines_provider = saas_file.pipelines_provider
-    base = GRAFANA_SAAS_DEPLOY_BASE_URL.rstrip("/")
+    grafana_base_url = grafana_saas_deploy_url.rstrip("/")
     return (
-        f"{base}?var-cluster={pipelines_provider.namespace.cluster.name}"
+        f"{grafana_base_url}?var-cluster={pipelines_provider.namespace.cluster.name}"
         f"&var-namespace={pipelines_provider.namespace.name}&var-pipeline={pipeline_name}"
     )
 
@@ -96,7 +98,7 @@ def slack_notify(
     ri: ResourceInventory,
     console_url: str,
     in_progress: bool,
-    grafana_logs_url: str,
+    grafana_logs_url: str | None = None,
     trigger_integration: str | None = None,
     trigger_reason: str | None = None,
     skip_successful_notifications: bool | None = False,
@@ -124,8 +126,10 @@ def slack_notify(
     message = (
         f"{icon} SaaS file *{saas_file_name}* "
         + f"deployment to environment *{env_name}*: "
-        + f"{description} - (<{console_url}|PipelineRuns>) (<{grafana_logs_url}|Logs>)"
+        + f"{description} - (<{console_url}|PipelineRuns>)"
     )
+    if grafana_logs_url:
+        message += f" (<{grafana_logs_url}|Logs>)"
     if trigger_reason:
         message += f". Reason: {trigger_reason}"
     if trigger_integration:
@@ -146,6 +150,7 @@ def run(
     trigger_integration: str | None = None,
     trigger_reason: str | None = None,
     saas_file_list: SaasFileList | None = None,
+    grafana_saas_deploy_url: str | None = None,
     defer: Callable | None = None,
 ) -> None:
     vault_settings = get_app_interface_vault_settings()
@@ -188,8 +193,15 @@ def run(
             console_url = compose_console_url(
                 saas_file, env_name, pipeline_name=pipeline_name
             )
-            grafana_logs_url = compose_grafana_logs_url(
-                saas_file, pipeline_name=pipeline_name
+            grafana_url = (grafana_saas_deploy_url or "").strip()
+            grafana_logs_url = (
+                compose_grafana_logs_url(
+                    saas_file,
+                    pipeline_name=pipeline_name,
+                    grafana_saas_deploy_url=grafana_url,
+                )
+                if grafana_url
+                else None
             )
             if (
                 defer

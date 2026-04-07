@@ -4,7 +4,6 @@ from unittest.mock import create_autospec
 import pytest
 
 from reconcile.openshift_saas_deploy import (
-    GRAFANA_SAAS_DEPLOY_BASE_URL,
     _saas_file_tekton_pipeline_name,
     compose_console_url,
     compose_grafana_logs_url,
@@ -20,7 +19,9 @@ from reconcile.utils import (
 )
 from reconcile.utils.saasherder.saasherder import UNIQUE_SAAS_FILE_ENV_COMBO_LEN
 
-TEST_GRAFANA_LOGS_URL = "https://grafana.url/d/logs?var-cluster=c"
+TEST_GRAFANA_SAAS_DEPLOY_URL = (
+    "https://grafana.example.test/d/saas-deploy-logs/saas-deploy-logs"
+)
 
 
 @pytest.fixture
@@ -62,11 +63,14 @@ def test_compose_grafana_logs_url(
 ) -> None:
     saas_file = saas_file_builder("saas_name")
     pipeline_name = _saas_file_tekton_pipeline_name(saas_file)
-    url = compose_grafana_logs_url(saas_file, pipeline_name=pipeline_name)
+    url = compose_grafana_logs_url(
+        saas_file,
+        pipeline_name=pipeline_name,
+        grafana_saas_deploy_url=TEST_GRAFANA_SAAS_DEPLOY_URL,
+    )
     assert (
-        url == f"{GRAFANA_SAAS_DEPLOY_BASE_URL}?"
-        "var-cluster=cluster_name&var-namespace=namespace_name&"
-        "var-pipeline=o-saas-deploy-saas_name"
+        url == f"{TEST_GRAFANA_SAAS_DEPLOY_URL.rstrip('/')}?var-cluster=cluster_name&"
+        "var-namespace=namespace_name&var-pipeline=o-saas-deploy-saas_name"
     )
 
 
@@ -75,8 +79,8 @@ def test_compose_console_url(
 ) -> None:
     saas_file = saas_file_builder("saas_name")
     env_name = "production"
-
     pipeline_name = _saas_file_tekton_pipeline_name(saas_file)
+
     url = compose_console_url(saas_file, env_name, pipeline_name=pipeline_name)
 
     assert (
@@ -92,8 +96,8 @@ def test_compose_console_url_with_medium_saas_name(
     saas_name = "saas-openshift-cert-manager-routes"
     saas_file = saas_file_builder(saas_name)
     env_name = "app-sre-production"
-
     pipeline_name = _saas_file_tekton_pipeline_name(saas_file)
+
     url = compose_console_url(saas_file, env_name, pipeline_name=pipeline_name)
 
     expected_run_name = f"{saas_name}-{env_name}"[:UNIQUE_SAAS_FILE_ENV_COMBO_LEN]
@@ -129,7 +133,6 @@ def test_slack_notify_skipped_success() -> None:
         console_url="https://test.local/console",
         in_progress=False,
         skip_successful_notifications=True,
-        grafana_logs_url=TEST_GRAFANA_LOGS_URL,
     )
     api.chat_post_message.assert_not_called()
 
@@ -144,13 +147,13 @@ def test_slack_notify_unskipped_success() -> None:
         console_url="https://test.local/console",
         in_progress=False,
         skip_successful_notifications=False,
-        grafana_logs_url=TEST_GRAFANA_LOGS_URL,
+        grafana_logs_url="https://test.local/grafana",
     )
     api.chat_post_message.assert_called_once_with(
         ":green_jenkins_circle: SaaS file *test-slack_notify--unskipped-success.yaml* "
         "deployment to environment *test*: Success "
         "- (<https://test.local/console|PipelineRuns>) "
-        "(<https://grafana.url/d/logs?var-cluster=c|Logs>)"
+        "(<https://test.local/grafana|Logs>)"
     )
 
 
@@ -166,13 +169,13 @@ def test_slack_notify_unskipped_failure() -> None:
         console_url="https://test.local/console",
         in_progress=False,
         skip_successful_notifications=False,
-        grafana_logs_url=TEST_GRAFANA_LOGS_URL,
+        grafana_logs_url="https://test.local/grafana",
     )
     api.chat_post_message.assert_called_once_with(
         ":red_jenkins_circle: SaaS file *test-saas-file-name.yaml* "
         "deployment to environment *test*: Failure "
         "- (<https://test.local/console|PipelineRuns>) "
-        "(<https://grafana.url/d/logs?var-cluster=c|Logs>)"
+        "(<https://test.local/grafana|Logs>)"
     )
 
 
@@ -188,13 +191,13 @@ def test_slack_notify_skipped_failure() -> None:
         console_url="https://test.local/console",
         in_progress=False,
         skip_successful_notifications=True,
-        grafana_logs_url=TEST_GRAFANA_LOGS_URL,
+        grafana_logs_url="https://test.local/grafana",
     )
     api.chat_post_message.assert_called_once_with(
         ":red_jenkins_circle: SaaS file *test-saas-file-name.yaml* "
         "deployment to environment *test*: Failure "
         "- (<https://test.local/console|PipelineRuns>) "
-        "(<https://grafana.url/d/logs?var-cluster=c|Logs>)"
+        "(<https://test.local/grafana|Logs>)"
     )
 
 
@@ -209,11 +212,11 @@ def test_slack_notify_skipped_in_progress() -> None:
         console_url="https://test.local/console",
         in_progress=True,
         skip_successful_notifications=True,
-        grafana_logs_url=TEST_GRAFANA_LOGS_URL,
+        grafana_logs_url="https://test.local/grafana",
     )
     api.chat_post_message.assert_called_once_with(
         ":yellow_jenkins_circle: SaaS file *test-saas-file-name.yaml* "
         "deployment to environment *test*: In Progress "
         "- (<https://test.local/console|PipelineRuns>) "
-        "(<https://grafana.url/d/logs?var-cluster=c|Logs>). There will not be a notice for success."
+        "(<https://test.local/grafana|Logs>). There will not be a notice for success."
     )
