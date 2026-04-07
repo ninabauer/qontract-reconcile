@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from collections.abc import Callable
+from urllib.parse import urlencode
 
 import reconcile.openshift_base as ob
 from reconcile import (
@@ -85,10 +86,14 @@ def compose_grafana_logs_url(
         )
     pipelines_provider = saas_file.pipelines_provider
     grafana_base_url = grafana_saas_deploy_url.rstrip("/")
-    return (
-        f"{grafana_base_url}?var-cluster={pipelines_provider.namespace.cluster.name}"
-        f"&var-namespace={pipelines_provider.namespace.name}&var-pipeline={pipeline_name}"
+    params = urlencode(
+        {
+            "var-cluster": pipelines_provider.namespace.cluster.name,
+            "var-namespace": pipelines_provider.namespace.name,
+            "var-pipeline": pipeline_name,
+        }
     )
+    return f"{grafana_base_url}?{params}"
 
 
 def slack_notify(
